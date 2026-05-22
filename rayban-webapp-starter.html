@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=600, height=600, initial-scale=1.0, user-scalable=no">
+  <title>Ray-Ban Display Starter</title>
+  <style>
+    /* ── Reset & Root ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --cyan:   #00e5ff;
+      --green:  #39ff14;
+      --amber:  #ffb300;
+      --dim:    rgba(255,255,255,0.12);
+      --focus:  0 0 0 2px #00e5ff, 0 0 18px rgba(0,229,255,0.5);
+      --font-mono: 'Courier New', monospace;
+    }
+
+    /* ── 600×600 Additive Display Canvas ─────────────────────── */
+    html, body {
+      width: 600px; height: 600px;
+      overflow: hidden;
+      background: #000;           /* transparent on additive display */
+      color: #fff;
+      font-family: var(--font-mono);
+      user-select: none;
+    }
+
+    /* ── Screens ──────────────────────────────────────────────── */
+    .screen {
+      position: absolute; inset: 0;
+      width: 600px; height: 600px;
+      display: none;
+      flex-direction: column;
+      padding: 28px;
+    }
+    .screen.active { display: flex; }
+
+    /* ── Home Screen ──────────────────────────────────────────── */
+    #home {
+      justify-content: space-between;
+    }
+    .home-header {
+      display: flex; justify-content: space-between; align-items: flex-start;
+    }
+    .home-title {
+      font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--cyan); opacity: 0.7;
+    }
+    .clock {
+      font-size: 64px; font-weight: 700; letter-spacing: -2px;
+      color: #fff; line-height: 1;
+      text-shadow: 0 0 30px rgba(255,255,255,0.15);
+    }
+    .date-line {
+      font-size: 12px; color: rgba(255,255,255,0.4);
+      letter-spacing: 0.12em; margin-top: 4px;
+    }
+
+    .menu-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .menu-item {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px;
+      padding: 16px 14px;
+      cursor: pointer;
+      transition: all 140ms ease;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .menu-item:focus {
+      outline: none;
+      box-shadow: var(--focus);
+      border-color: var(--cyan);
+      background: rgba(0,229,255,0.07);
+    }
+    .menu-icon { font-size: 22px; }
+    .menu-label {
+      font-size: 11px; letter-spacing: 0.1em;
+      text-transform: uppercase; color: rgba(255,255,255,0.6);
+    }
+    .menu-desc {
+      font-size: 10px; color: rgba(255,255,255,0.28);
+    }
+
+    .hint-bar {
+      display: flex; gap: 16px; justify-content: center;
+      font-size: 10px; color: rgba(255,255,255,0.2);
+      letter-spacing: 0.08em;
+    }
+    .hint-bar span { display: flex; align-items: center; gap: 4px; }
+    .key {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 3px; padding: 1px 5px;
+      font-size: 9px;
+    }
+
+    /* ── Sensor Screen ────────────────────────────────────────── */
+    #sensors { gap: 16px; }
+    .screen-title {
+      font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase;
+      color: var(--cyan); margin-bottom: 4px;
+    }
+    .sensor-grid {
+      display: grid; grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px; flex: 1;
+    }
+    .sensor-card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 8px;
+      padding: 12px 10px;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .sensor-name {
+      font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase;
+      color: rgba(255,255,255,0.35);
+    }
+    .sensor-val {
+      font-size: 22px; font-weight: 700; color: var(--green);
+      line-height: 1;
+    }
+    .sensor-unit {
+      font-size: 9px; color: rgba(255,255,255,0.25);
+    }
+    .perm-btn {
+      background: rgba(0,229,255,0.08);
+      border: 1px solid rgba(0,229,255,0.3);
+      border-radius: 8px; color: var(--cyan);
+      font-family: var(--font-mono); font-size: 11px;
+      letter-spacing: 0.1em; padding: 12px;
+      cursor: pointer; text-transform: uppercase;
+      transition: all 140ms;
+    }
+    .perm-btn:focus {
+      outline: none; box-shadow: var(--focus);
+    }
+    .back-btn {
+      background: none; border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 6px; color: rgba(255,255,255,0.4);
+      font-family: var(--font-mono); font-size: 10px;
+      letter-spacing: 0.12em; padding: 8px 14px;
+      cursor: pointer; text-transform: uppercase;
+      transition: all 140ms; align-self: flex-start;
+    }
+    .back-btn:focus {
+      outline: none; box-shadow: var(--focus);
+      border-color: var(--cyan); color: var(--cyan);
+    }
+
+    /* ── Location Screen ──────────────────────────────────────── */
+    #location { gap: 16px; }
+    .loc-display {
+      flex: 1;
+      display: flex; flex-direction: column;
+      justify-content: center; align-items: center; gap: 12px;
+    }
+    .coord-row {
+      display: flex; align-items: baseline; gap: 8px;
+    }
+    .coord-label {
+      font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
+      color: rgba(255,255,255,0.3); width: 32px;
+    }
+    .coord-val {
+      font-size: 28px; font-weight: 700; color: var(--amber);
+    }
+    .coord-unit { font-size: 11px; color: rgba(255,255,255,0.3); }
+    .loc-accuracy {
+      font-size: 11px; color: rgba(255,255,255,0.25);
+      letter-spacing: 0.08em;
+    }
+    .loc-status {
+      font-size: 12px; color: rgba(255,255,255,0.4);
+      text-align: center; padding: 20px;
+    }
+    .loc-btn {
+      background: rgba(255,179,0,0.08);
+      border: 1px solid rgba(255,179,0,0.3);
+      border-radius: 8px; color: var(--amber);
+      font-family: var(--font-mono); font-size: 11px;
+      letter-spacing: 0.1em; padding: 12px;
+      cursor: pointer; text-transform: uppercase;
+      transition: all 140ms;
+    }
+    .loc-btn:focus { outline: none; box-shadow: 0 0 0 2px var(--amber), 0 0 18px rgba(255,179,0,0.4); }
+
+    /* ── Storage Screen ───────────────────────────────────────── */
+    #storage { gap: 14px; }
+    .note-display {
+      flex: 1;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 10px; padding: 16px;
+      font-size: 13px; line-height: 1.6;
+      color: rgba(255,255,255,0.75);
+      min-height: 200px;
+    }
+    .note-display.placeholder { color: rgba(255,255,255,0.18); font-style: italic; }
+    .storage-actions {
+      display: flex; gap: 8px;
+    }
+    .action-btn {
+      flex: 1;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 7px; color: rgba(255,255,255,0.5);
+      font-family: var(--font-mono); font-size: 10px;
+      letter-spacing: 0.1em; padding: 10px 8px;
+      cursor: pointer; text-transform: uppercase;
+      transition: all 140ms;
+    }
+    .action-btn:focus {
+      outline: none; box-shadow: var(--focus);
+      border-color: var(--cyan); color: var(--cyan);
+      background: rgba(0,229,255,0.06);
+    }
+    .action-btn.danger:focus {
+      box-shadow: 0 0 0 2px #ff4444, 0 0 14px rgba(255,68,68,0.4);
+      border-color: #ff4444; color: #ff4444;
+      background: rgba(255,68,68,0.06);
+    }
+    .storage-info {
+      font-size: 10px; color: rgba(255,255,255,0.18);
+      letter-spacing: 0.08em; text-align: center;
+    }
+
+    /* ── Scan line overlay (subtle CRT feel) ──────────────────── */
+    body::after {
+      content: '';
+      position: fixed; inset: 0; pointer-events: none;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.04) 2px,
+        rgba(0,0,0,0.04) 4px
+      );
+    }
+
+    /* ── Animations ───────────────────────────────────────────── */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .screen.active { animation: fadeIn 180ms ease; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.5; }
+    }
+    .live-dot {
+      display: inline-block; width: 6px; height: 6px;
+      border-radius: 50%; background: var(--green);
+      animation: pulse 1.4s ease infinite;
+      margin-right: 6px; vertical-align: middle;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SCREEN 1: HOME
+═════════════════════════════════════════════════════════════ -->
+<section id="home" class="screen active">
+  <div class="home-header">
+    <div>
+      <div class="home-title">Ray-Ban Display</div>
+      <div class="clock" id="clock">00:00</div>
+      <div class="date-line" id="date-line">—</div>
+    </div>
+  </div>
+
+  <div class="menu-grid">
+    <button class="menu-item focusable" tabindex="0" data-target="sensors">
+      <div class="menu-icon">📡</div>
+      <div class="menu-label">Sensors</div>
+      <div class="menu-desc">IMU · gyro · compass</div>
+    </button>
+    <button class="menu-item focusable" tabindex="0" data-target="location">
+      <div class="menu-icon">📍</div>
+      <div class="menu-label">Location</div>
+      <div class="menu-desc">GPS via phone</div>
+    </button>
+    <button class="menu-item focusable" tabindex="0" data-target="storage">
+      <div class="menu-icon">💾</div>
+      <div class="menu-label">Storage</div>
+      <div class="menu-desc">localStorage demo</div>
+    </button>
+    <button class="menu-item focusable" tabindex="0" data-target="home" id="about-btn">
+      <div class="menu-icon">⚙️</div>
+      <div class="menu-label">About</div>
+      <div class="menu-desc">Template v1.0</div>
+    </button>
+  </div>
+
+  <div class="hint-bar">
+    <span><span class="key">▲▼◀▶</span> Navigate</span>
+    <span><span class="key">↵</span> Select</span>
+    <span><span class="key">Esc</span> Back</span>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     SCREEN 2: SENSORS
+═════════════════════════════════════════════════════════════ -->
+<section id="sensors" class="screen">
+  <div class="screen-title"><span class="live-dot"></span>Motion &amp; Orientation</div>
+
+  <div class="sensor-grid" id="sensor-grid">
+    <div class="sensor-card">
+      <div class="sensor-name">Heading</div>
+      <div class="sensor-val" id="s-heading">—</div>
+      <div class="sensor-unit">degrees</div>
+    </div>
+    <div class="sensor-card">
+      <div class="sensor-name">Tilt</div>
+      <div class="sensor-val" id="s-tilt">—</div>
+      <div class="sensor-unit">β °</div>
+    </div>
+    <div class="sensor-card">
+      <div class="sensor-name">Roll</div>
+      <div class="sensor-val" id="s-roll">—</div>
+      <div class="sensor-unit">γ °</div>
+    </div>
+    <div class="sensor-card">
+      <div class="sensor-name">Accel X</div>
+      <div class="sensor-val" id="s-ax">—</div>
+      <div class="sensor-unit">m/s²</div>
+    </div>
+    <div class="sensor-card">
+      <div class="sensor-name">Accel Y</div>
+      <div class="sensor-val" id="s-ay">—</div>
+      <div class="sensor-unit">m/s²</div>
+    </div>
+    <div class="sensor-card">
+      <div class="sensor-name">G-Force</div>
+      <div class="sensor-val" id="s-g">—</div>
+      <div class="sensor-unit">G</div>
+    </div>
+  </div>
+
+  <button class="perm-btn focusable" id="perm-btn" tabindex="0">
+    Enable Sensors
+  </button>
+  <button class="back-btn focusable" tabindex="0" data-target="home">
+    ← Back
+  </button>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     SCREEN 3: LOCATION
+═════════════════════════════════════════════════════════════ -->
+<section id="location" class="screen">
+  <div class="screen-title">GPS Location</div>
+
+  <div class="loc-display" id="loc-display">
+    <div class="loc-status" id="loc-status">Press "Get Location" to request GPS from paired phone.</div>
+  </div>
+
+  <button class="loc-btn focusable" id="loc-btn" tabindex="0">
+    📍 Get Location
+  </button>
+  <button class="back-btn focusable" tabindex="0" data-target="home">
+    ← Back
+  </button>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     SCREEN 4: LOCAL STORAGE DEMO
+═════════════════════════════════════════════════════════════ -->
+<section id="storage" class="screen">
+  <div class="screen-title">Local Storage Demo</div>
+
+  <div class="note-display" id="note-display">
+    <span class="placeholder-text">No note saved yet.</span>
+  </div>
+
+  <div class="storage-actions">
+    <button class="action-btn focusable" id="save-btn" tabindex="0">💾 Save Note</button>
+    <button class="action-btn focusable danger" id="clear-btn" tabindex="0">🗑 Clear</button>
+  </div>
+
+  <div class="storage-info" id="storage-info">localStorage · 5 MB limit</div>
+
+  <button class="back-btn focusable" tabindex="0" data-target="home">
+    ← Back
+  </button>
+</section>
+
+
+<script>
+// ─────────────────────────────────────────────────────────
+// NAVIGATION
+// ─────────────────────────────────────────────────────────
+let currentScreen = 'home';
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  currentScreen = id;
+
+  // Auto-focus first focusable element
+  const first = document.querySelector(`#${id} .focusable`);
+  if (first) first.focus();
+}
+
+// D-pad / gesture input → arrow keys + Enter
+const DPAD = { UP:'ArrowUp', DOWN:'ArrowDown', LEFT:'ArrowLeft', RIGHT:'ArrowRight', SELECT:'Enter', BACK:'Escape' };
+
+function getFocusables() {
+  return Array.from(document.querySelectorAll(`#${currentScreen} .focusable`));
+}
+
+function moveFocus(dir) {
+  const items = getFocusables();
+  if (!items.length) return;
+  const idx = items.indexOf(document.activeElement);
+  if (idx === -1) { items[0].focus(); return; }
+  const next = (dir === 'up' || dir === 'left')
+    ? (idx > 0 ? idx - 1 : items.length - 1)
+    : (idx < items.length - 1 ? idx + 1 : 0);
+  items[next].focus();
+}
+
+document.addEventListener('keydown', e => {
+  switch (e.key) {
+    case DPAD.UP:    moveFocus('up');   break;
+    case DPAD.DOWN:  moveFocus('down'); break;
+    case DPAD.LEFT:  moveFocus('left'); break;
+    case DPAD.RIGHT: moveFocus('right');break;
+    case DPAD.SELECT:
+      if (document.activeElement?.classList.contains('focusable'))
+        document.activeElement.click();
+      break;
+    case DPAD.BACK:
+      if (currentScreen !== 'home') showScreen('home');
+      break;
+    default: return;
+  }
+  e.preventDefault();
+});
+
+// Click / tap on menu items or back buttons
+document.addEventListener('click', e => {
+  const btn = e.target.closest('[data-target]');
+  if (btn) showScreen(btn.dataset.target);
+});
+
+
+// ─────────────────────────────────────────────────────────
+// CLOCK
+// ─────────────────────────────────────────────────────────
+function updateClock() {
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2, '0');
+  const mm = String(now.getMinutes()).padStart(2, '0');
+  document.getElementById('clock').textContent = `${hh}:${mm}`;
+  document.getElementById('date-line').textContent =
+    now.toLocaleDateString('en-US', { weekday:'long', month:'short', day:'numeric' }).toUpperCase();
+}
+updateClock();
+setInterval(updateClock, 10000);
+
+
+// ─────────────────────────────────────────────────────────
+// SENSORS
+// ─────────────────────────────────────────────────────────
+let sensorsActive = false;
+
+function startIMU() {
+  window.addEventListener('deviceorientation', e => {
+    document.getElementById('s-heading').textContent = e.alpha != null ? e.alpha.toFixed(1) : '—';
+    document.getElementById('s-tilt').textContent    = e.beta  != null ? e.beta.toFixed(1)  : '—';
+    document.getElementById('s-roll').textContent    = e.gamma != null ? e.gamma.toFixed(1) : '—';
+  });
+  window.addEventListener('devicemotion', e => {
+    const g = e.accelerationIncludingGravity;
+    if (g) {
+      document.getElementById('s-ax').textContent = g.x != null ? g.x.toFixed(2) : '—';
+      document.getElementById('s-ay').textContent = g.y != null ? g.y.toFixed(2) : '—';
+      const mag = Math.sqrt((g.x||0)**2 + (g.y||0)**2 + (g.z||0)**2) / 9.81;
+      document.getElementById('s-g').textContent = mag.toFixed(2);
+    }
+  });
+  document.getElementById('perm-btn').textContent = 'Sensors Active ✓';
+  document.getElementById('perm-btn').style.color = 'var(--green)';
+  document.getElementById('perm-btn').style.borderColor = 'rgba(57,255,20,0.4)';
+  sensorsActive = true;
+}
+
+document.getElementById('perm-btn').addEventListener('click', () => {
+  if (sensorsActive) return;
+  if (typeof DeviceOrientationEvent !== 'undefined' &&
+      typeof DeviceOrientationEvent.requestPermission === 'function') {
+    DeviceOrientationEvent.requestPermission()
+      .then(state => { if (state === 'granted') startIMU(); })
+      .catch(err => console.error(err));
+  } else {
+    startIMU(); // Glasses runtime grants automatically
+  }
+});
+
+
+// ─────────────────────────────────────────────────────────
+// LOCATION
+// ─────────────────────────────────────────────────────────
+document.getElementById('loc-btn').addEventListener('click', () => {
+  document.getElementById('loc-status').textContent = 'Requesting GPS from phone…';
+  document.getElementById('loc-display').innerHTML =
+    '<div class="loc-status">Requesting GPS from paired phone…</div>';
+
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      const c = pos.coords;
+      document.getElementById('loc-display').innerHTML = `
+        <div class="coord-row">
+          <div class="coord-label">LAT</div>
+          <div class="coord-val">${c.latitude.toFixed(5)}</div>
+          <div class="coord-unit">°</div>
+        </div>
+        <div class="coord-row">
+          <div class="coord-label">LON</div>
+          <div class="coord-val">${c.longitude.toFixed(5)}</div>
+          <div class="coord-unit">°</div>
+        </div>
+        <div class="loc-accuracy">± ${c.accuracy.toFixed(0)} m accuracy</div>
+      `;
+      document.getElementById('loc-btn').textContent = '🔄 Refresh';
+    },
+    err => {
+      const msgs = { 1:'Permission denied', 2:'Location unavailable', 3:'Request timed out' };
+      document.getElementById('loc-display').innerHTML =
+        `<div class="loc-status" style="color:#ff6b6b;">Error ${err.code}: ${msgs[err.code] || err.message}</div>`;
+    },
+    { timeout: 15000, enableHighAccuracy: true }
+  );
+});
+
+
+// ─────────────────────────────────────────────────────────
+// LOCAL STORAGE DEMO
+// ─────────────────────────────────────────────────────────
+const NOTES_KEY = 'rb_demo_note';
+const SAMPLE_NOTES = [
+  'Pick up groceries on the way home.',
+  'Meeting at 3pm — bring the design mockups.',
+  'Call back re: the project proposal.',
+  'Gym: leg day. Don\'t skip.',
+  'Remember to water the plants.',
+];
+let noteIndex = 0;
+
+function renderNote() {
+  const saved = localStorage.getItem(NOTES_KEY);
+  const el = document.getElementById('note-display');
+  if (saved) {
+    el.textContent = saved;
+    el.classList.remove('placeholder');
+    document.getElementById('storage-info').textContent =
+      `${saved.length} chars saved · localStorage · 5 MB limit`;
+  } else {
+    el.innerHTML = '<span class="placeholder-text">No note saved yet.</span>';
+    document.getElementById('storage-info').textContent = 'localStorage · 5 MB limit';
+  }
+}
+renderNote();
+
+document.getElementById('save-btn').addEventListener('click', () => {
+  const note = SAMPLE_NOTES[noteIndex % SAMPLE_NOTES.length];
+  noteIndex++;
+  localStorage.setItem(NOTES_KEY, note);
+  renderNote();
+});
+
+document.getElementById('clear-btn').addEventListener('click', () => {
+  localStorage.removeItem(NOTES_KEY);
+  renderNote();
+});
+</script>
+</body>
+</html>
